@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "concurrently \"pnpm --filter client dev\" \"pnpm --filter server dev\"",
     "build": "pnpm --filter @chatterroom/crypto build && pnpm --filter client build && pnpm --filter server build",
+    "invite": "node scripts/invite-devs.mjs",
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint:fix",
     "test": "pnpm -r test",
