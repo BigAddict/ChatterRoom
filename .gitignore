@@ -38,3 +38,7 @@ vite.config.ts.timestamp-*
 
 # Testing
 __snapshots__/
+
+# Sensitive roster data
+roster.csv
+scripts/roster.csv
