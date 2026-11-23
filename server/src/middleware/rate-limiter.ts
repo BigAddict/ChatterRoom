@@ -43,5 +43,5 @@ export const cleanupRateLimits = (): void => {
   }
 };
 
-// Clean up every 60 seconds
-setInterval(cleanupRateLimits, 60_000);
+// Clean up every 60 seconds without keeping the event loop alive on shutdown
+setInterval(cleanupRateLimits, 60_000).unref();

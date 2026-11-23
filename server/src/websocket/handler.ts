@@ -19,8 +19,9 @@ interface IncomingMessage {
  * @param req - The originating Fastify request
  */
 export const handleWebSocketConnection = (socket: WebSocket, req: FastifyRequest): void => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const roomId = url.searchParams.get('room');
+  const paramRoomId = (req.params as { roomId?: string } | undefined)?.roomId;
+  const url = new URL(req.url, 'http://localhost');
+  const roomId = paramRoomId || url.searchParams.get('room');
   const clientIp = req.ip;
 
   if (!roomId) {
