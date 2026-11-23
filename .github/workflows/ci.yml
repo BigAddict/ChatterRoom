@@ -87,7 +87,7 @@ jobs:
   test-server:
     name: Test — Server
     runs-on: ubuntu-latest
-    needs: [test-crypto]
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -129,7 +129,7 @@ jobs:
   test-client:
     name: Test — Client
     runs-on: ubuntu-latest
-    needs: [test-crypto]
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
