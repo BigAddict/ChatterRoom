@@ -1,7 +1,7 @@
 name: Discord Notifications
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, closed, reopened]
   push:
     branches: [main]
@@ -21,20 +21,19 @@ jobs:
             exit 0
           fi
 
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "pull_request_target" ]; then
             if [ "${{ github.event.action }}" = "opened" ]; then
-              MESSAGE="📥 **[ChatterRoom] New Pull Request**\n**${{ github.event.pull_request.title }}**\nBy: ${{ github.event.pull_request.user.login }}\n${{ github.event.pull_request.html_url }}"
+              MESSAGE="📥 **[ChatterRoom] New Pull Request**"$'\n'"**${{ github.event.pull_request.title }}**"$'\n'"By: ${{ github.event.pull_request.user.login }}"$'\n'"${{ github.event.pull_request.html_url }}"
             elif [ "${{ github.event.pull_request.merged }}" = "true" ]; then
-              MESSAGE="✅ **[ChatterRoom] PR Merged**\n**${{ github.event.pull_request.title }}**\nMerged by: ${{ github.event.pull_request.merged_by.login }}\n${{ github.event.pull_request.html_url }}"
+              MESSAGE="✅ **[ChatterRoom] PR Merged**"$'\n'"**${{ github.event.pull_request.title }}**"$'\n'"Merged by: ${{ github.event.pull_request.merged_by.login }}"$'\n'"${{ github.event.pull_request.html_url }}"
             else
-              MESSAGE="❌ **[ChatterRoom] PR Closed**\n**${{ github.event.pull_request.title }}**\n${{ github.event.pull_request.html_url }}"
+              MESSAGE="❌ **[ChatterRoom] PR Closed**"$'\n'"**${{ github.event.pull_request.title }}**"$'\n'"${{ github.event.pull_request.html_url }}"
             fi
           elif [ "${{ github.event_name }}" = "push" ]; then
-            MESSAGE="🚀 **[ChatterRoom] Push to main**\nBy: ${{ github.actor }}\nCommit: ${{ github.event.head_commit.message }}"
+            MESSAGE="🚀 **[ChatterRoom] Push to main**"$'\n'"By: ${{ github.actor }}"$'\n'"Commit: ${{ github.event.head_commit.message }}"
           else
-            MESSAGE="📋 **[ChatterRoom] Issue ${{ github.event.action }}**\n**${{ github.event.issue.title }}**\n${{ github.event.issue.html_url }}"
+            MESSAGE="📋 **[ChatterRoom] Issue ${{ github.event.action }}**"$'\n'"**${{ github.event.issue.title }}**"$'\n'"${{ github.event.issue.html_url }}"
           fi
 
-          curl -H "Content-Type: application/json" \
-            -d "{\"content\": \"$MESSAGE\"}" \
-            $DISCORD_WEBHOOK
+          PAYLOAD=$(jq -n --arg content "$MESSAGE" '{content: $content}')
+          curl -s -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK"
