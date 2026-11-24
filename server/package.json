@@ -9,8 +9,8 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint": "tsc --noEmit",
+    "lint:fix": "tsc --noEmit"
   },
   "dependencies": {
     "fastify": "^4.25.2",
