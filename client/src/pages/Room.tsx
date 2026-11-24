@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { ChatWindow } from '../components/ChatWindow';
 import { MessageInput } from '../components/MessageInput';
 import { RoomHeader } from '../components/RoomHeader';
@@ -20,13 +20,14 @@ interface ServerMessage {
 export const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // The key lives in the hash fragment so it's never sent to the server
   const encryptionKey = location.hash.slice(1);
 
   const { keys, encrypt, decrypt, isReady: cryptoReady } = useCrypto(encryptionKey);
   const { sendMessage, connectionStatus, lastMessage } = useWebSocket(roomId ?? '');
-  const { messages, userCount, addMessage, setUserCount } = useRoom();
+  const { messages, userCount, addMessage, setUserCount, clearMessages } = useRoom();
 
   useEffect(() => {
     if (!lastMessage) return;
@@ -79,6 +80,11 @@ export const Room: React.FC = () => {
     });
   };
 
+  const handleLeave = () => {
+    clearMessages();
+    navigate('/');
+  };
+
   if (!roomId || !encryptionKey) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-900 text-white">
@@ -89,7 +95,12 @@ export const Room: React.FC = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-900 text-white">
-      <RoomHeader roomId={roomId} userCount={userCount} />
+      <RoomHeader
+        roomId={roomId}
+        userCount={userCount}
+        isEncrypted={cryptoReady}
+        onLeave={handleLeave}
+      />
       <ChatWindow messages={messages} />
       <MessageInput onSend={handleSend} disabled={connectionStatus !== 'connected'} />
     </div>
