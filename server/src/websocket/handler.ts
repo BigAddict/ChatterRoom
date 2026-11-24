@@ -3,6 +3,7 @@ import type { FastifyRequest } from 'fastify';
 import { RoomManager } from './room-manager.js';
 import { checkRateLimit } from '../middleware/rate-limiter.js';
 import { logger } from '../utils/logger.js';
+import { startHeartbeat } from './heartbeat.js';
 
 const roomManager = new RoomManager();
 
@@ -31,6 +32,7 @@ export const handleWebSocketConnection = (socket: WebSocket, req: FastifyRequest
 
   logger.info(`Client connected to room ${roomId} from ${clientIp}`);
   roomManager.joinRoom(roomId, socket);
+  startHeartbeat(socket);
 
   socket.on('message', (raw: Buffer) => {
     // Rate limiting
