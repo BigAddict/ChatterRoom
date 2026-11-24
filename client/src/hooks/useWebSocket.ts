@@ -12,8 +12,30 @@ export interface UseWebSocketReturn {
   lastMessage: string | null;
 }
 
+const MAX_RECONNECT_DELAY_MS = 30_000;
+const BASE_RECONNECT_DELAY_MS = 1_000;
+
 /**
- * Custom hook that manages a WebSocket connection to a chat room.
+ * Build the WebSocket URL for a given room ID and browser location.
+ */
+export const buildWebSocketUrl = (
+  roomId: string,
+  location: Pick<Location, 'protocol' | 'host'>,
+): string => {
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${location.host}/ws/${encodeURIComponent(roomId)}`;
+};
+
+/**
+ * Compute exponential backoff delay in milliseconds for reconnection attempts.
+ */
+export const getReconnectDelay = (attempt: number): number => {
+  return Math.min(BASE_RECONNECT_DELAY_MS * 2 ** Math.max(0, attempt), MAX_RECONNECT_DELAY_MS);
+};
+
+/**
+ * Custom hook that manages a WebSocket connection to a chat room
+ * with automatic exponential-backoff reconnection.
  *
  * @param roomId - The room identifier to connect to
  * @returns WebSocket controls and state
@@ -26,20 +48,43 @@ export const useWebSocket = (roomId: string): UseWebSocketReturn => {
   useEffect(() => {
     if (!roomId) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws?room=${roomId}`;
+    let isUnmounted = false;
+    let attempt = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
-    setConnectionStatus('connecting');
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    const connect = () => {
+      if (isUnmounted) return;
+      const wsUrl = buildWebSocketUrl(roomId, window.location);
 
-    ws.onopen = () => setConnectionStatus('connected');
-    ws.onmessage = (event) => setLastMessage(event.data as string);
-    ws.onerror = () => setConnectionStatus('error');
-    ws.onclose = () => setConnectionStatus('disconnected');
+      setConnectionStatus('connecting');
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        attempt = 0;
+        setConnectionStatus('connected');
+      };
+      ws.onmessage = (event) => setLastMessage(event.data as string);
+      ws.onerror = () => setConnectionStatus('error');
+      ws.onclose = () => {
+        if (isUnmounted) {
+          setConnectionStatus('disconnected');
+          return;
+        }
+        setConnectionStatus('disconnected');
+        const delay = getReconnectDelay(attempt++);
+        reconnectTimer = setTimeout(connect, delay);
+      };
+    };
+
+    connect();
 
     return () => {
-      ws.close();
+      isUnmounted = true;
+      if (reconnectTimer !== undefined) {
+        clearTimeout(reconnectTimer);
+      }
+      wsRef.current?.close();
       wsRef.current = null;
     };
   }, [roomId]);

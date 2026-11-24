@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { ChatWindow } from '../components/ChatWindow';
 import { MessageInput } from '../components/MessageInput';
@@ -6,6 +6,11 @@ import { RoomHeader } from '../components/RoomHeader';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCrypto } from '../hooks/useCrypto';
 import { useRoom } from '../hooks/useRoom';
+
+interface ServerMessage {
+  type: string;
+  data?: unknown;
+}
 
 /**
  * Chat room page.
@@ -20,14 +25,58 @@ export const Room: React.FC = () => {
   const encryptionKey = location.hash.slice(1);
 
   const { keys, encrypt, decrypt, isReady: cryptoReady } = useCrypto(encryptionKey);
-  const { sendMessage, connectionStatus } = useWebSocket(roomId ?? '');
-  const { messages, userCount, addMessage } = useRoom();
+  const { sendMessage, connectionStatus, lastMessage } = useWebSocket(roomId ?? '');
+  const { messages, userCount, addMessage, setUserCount } = useRoom();
+
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    let cancelled = false;
+    const handleIncoming = async () => {
+      try {
+        const parsed = JSON.parse(lastMessage) as ServerMessage;
+        if (parsed.type === 'room_info' && parsed.data && typeof parsed.data === 'object') {
+          const count = (parsed.data as { userCount?: unknown }).userCount;
+          if (typeof count === 'number') {
+            setUserCount(count);
+          }
+          return;
+        }
+
+        if (parsed.type === 'chat' && typeof parsed.data === 'string' && cryptoReady) {
+          const plaintext = await decrypt(parsed.data);
+          if (!cancelled) {
+            addMessage({
+              id: crypto.randomUUID(),
+              sender: 'Peer',
+              content: plaintext,
+              timestamp: Date.now(),
+              isMine: false,
+            });
+          }
+        }
+      } catch {
+        // Ignore malformed or undecryptable payloads
+      }
+    };
+
+    void handleIncoming();
+    return () => {
+      cancelled = true;
+    };
+  }, [lastMessage, cryptoReady, decrypt, addMessage, setUserCount]);
 
   const handleSend = async (plaintext: string) => {
     if (!cryptoReady || !keys) return;
-    // TODO: encrypt plaintext then send over WebSocket
     const encrypted = await encrypt(plaintext);
-    sendMessage(encrypted);
+    sendMessage(JSON.stringify({ type: 'chat', data: encrypted }));
+    addMessage({
+      id: crypto.randomUUID(),
+      sender: 'You',
+      content: plaintext,
+      timestamp: Date.now(),
+      isMine: true,
+    });
   };
 
   if (!roomId || !encryptionKey) {
