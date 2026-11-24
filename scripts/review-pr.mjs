@@ -43,7 +43,7 @@ Guidelines:
    - "✅ **Verdict: Ready to Merge**" OR
    - "⚠️ **Verdict: Changes Requested** (with actionable code fixes)"`;
 
-async function queryGemini(diff: string): Promise<string | null> {
+async function queryGemini(diff) {
   if (!GEMINI_API_KEY) return null;
 
   const models = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
@@ -76,7 +76,7 @@ async function queryGemini(diff: string): Promise<string | null> {
   return null;
 }
 
-async function queryGroq(diff: string): Promise<string | null> {
+async function queryGroq(diff) {
   if (!GROQ_API_KEY) return null;
   console.log('🤖 Serving review via Groq (Llama-3-70B)...');
 
