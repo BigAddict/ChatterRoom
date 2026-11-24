@@ -3,46 +3,31 @@
 /**
  * Pirate Devs — Automated AI Pull Request Reviewer
  *
- * Fetches the PR diff, sends it to Groq Llama-3-70B for analysis,
- * checks for breaking bugs, security issues, and best practices,
- * and posts a constructive review comment on the PR.
+ * Primary Engine: Google Gemini (Gemini 3.8 Flash / Gemini Flash Latest)
+ * Fallback Engine: Groq Cloud (Llama 3 70B)
+ *
+ * Checks PR diffs for security, zero-storage guarantees, Web Crypto usage,
+ * TypeScript typing, and architectural best practices.
  */
 
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
 
 const PR_NUMBER = process.env.PR_NUMBER;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
 if (!PR_NUMBER) {
   console.error('Missing PR_NUMBER environment variable');
   process.exit(1);
 }
 
-if (!GROQ_API_KEY) {
-  console.log('GROQ_API_KEY not configured. Skipping automated AI review.');
+if (!GEMINI_API_KEY && !GROQ_API_KEY) {
+  console.log('Neither GEMINI_API_KEY nor GROQ_API_KEY configured. Skipping automated review.');
   process.exit(0);
 }
 
-async function reviewPR() {
-  console.log(`🔍 Fetching diff for PR #${PR_NUMBER}...`);
-  let diff = '';
-  try {
-    diff = execSync(`gh pr diff ${PR_NUMBER}`, { maxBuffer: 10 * 1024 * 1024 }).toString();
-  } catch (err) {
-    console.error('Failed to get PR diff:', err.message);
-    process.exit(1);
-  }
-
-  if (!diff || diff.trim().length === 0) {
-    console.log('No diff found. Skipping review.');
-    return;
-  }
-
-  // Truncate diff if massive to fit context window
-  const truncatedDiff = diff.slice(0, 15000);
-
-  const systemPrompt = `You are an expert senior code reviewer for "ChatterRoom", an open-source, zero-storage end-to-end encrypted (E2EE) WebSocket chat app by Pirate Devs.
+const systemPrompt = `You are an expert senior code reviewer for "ChatterRoom", an open-source, zero-storage end-to-end encrypted (E2EE) WebSocket chat app by Pirate Devs.
 Your job is to provide concise, friendly, and constructive reviews for open-source contributors.
 
 Guidelines:
@@ -58,58 +43,102 @@ Guidelines:
    - "✅ **Verdict: Ready to Merge**" OR
    - "⚠️ **Verdict: Changes Requested** (with actionable code fixes)"`;
 
-  const userPrompt = `Please review this Pull Request diff for ChatterRoom:
+async function queryGemini(diff: string): Promise<string | null> {
+  if (!GEMINI_API_KEY) return null;
 
-\`\`\`diff
-${truncatedDiff}
-\`\`\`
+  const models = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
+  for (const model of models) {
+    try {
+      console.log(`🤖 Attempting review with Google Gemini (${model})...`);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: 'user', parts: [{ text: `Review this Pull Request diff for ChatterRoom:\n\n\`\`\`diff\n${diff}\n\`\`\`` }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 1000 },
+        }),
+      });
 
-Format your review in GitHub Markdown with:
-### 🏴‍☠️ Pirate Devs AI Code Review
-- **Summary**: (1-2 sentences)
-- **Strengths**: (What was done well)
-- **Suggestions / Fixes**: (If any, provide code snippets)
-- **Verdict**: (Ready to merge / Changes requested)`;
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (text) return text;
+      } else {
+        const err = await res.text();
+        console.warn(`Gemini (${model}) returned non-200:`, err.slice(0, 150));
+      }
+    } catch (err) {
+      console.warn(`Gemini (${model}) fetch error:`, err.message);
+    }
+  }
+  return null;
+}
 
-  console.log('🤖 Sending diff to Groq Llama-3-70B...');
+async function queryGroq(diff: string): Promise<string | null> {
+  if (!GROQ_API_KEY) return null;
+  console.log('🤖 Serving review via Groq (Llama-3-70B)...');
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: 'llama3-70b-8192',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.2,
-      max_tokens: 1000,
-    }),
-  });
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama3-70b-8192',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Review this Pull Request diff for ChatterRoom:\n\n\`\`\`diff\n${diff.slice(0, 15000)}\n\`\`\`` },
+        ],
+        temperature: 0.2,
+        max_tokens: 1000,
+      }),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Groq API error:', errorText);
+    if (res.ok) {
+      const data = await res.json();
+      return data?.choices?.[0]?.message?.content?.trim() || null;
+    }
+  } catch (err) {
+    console.error('Groq fetch error:', err.message);
+  }
+  return null;
+}
+
+async function run() {
+  console.log(`🔍 Fetching diff for PR #${PR_NUMBER}...`);
+  let diff = '';
+  try {
+    diff = execSync(`gh pr diff ${PR_NUMBER}`, { maxBuffer: 10 * 1024 * 1024 }).toString();
+  } catch (err) {
+    console.error('Failed to get PR diff:', err.message);
+    process.exit(1);
+  }
+
+  if (!diff || diff.trim().length === 0) {
+    console.log('No diff found. Skipping review.');
     return;
   }
 
-  const data = await response.json();
-  const reviewContent = data.choices?.[0]?.message?.content?.trim();
+  // 1. Try Gemini first (deep context & reasoning)
+  let review = await queryGemini(diff);
 
-  if (!reviewContent) {
-    console.log('No review generated.');
+  // 2. Fall back to Groq if Gemini hits 503 high demand or fails
+  if (!review) {
+    console.log('🔄 Switching to fallback review engine...');
+    review = await queryGroq(diff);
+  }
+
+  if (!review) {
+    console.error('Failed to generate review from all AI providers.');
     return;
   }
 
-  console.log('💬 Posting review comment on GitHub PR...');
-
-  // Write review to temporary file to avoid shell escaping issues
-  const fs = await import('node:fs');
-  fs.writeFileSync('pr_review.md', reviewContent, 'utf8');
-
+  // Post review comment on GitHub PR
+  fs.writeFileSync('pr_review.md', review, 'utf8');
   try {
     execSync(`gh pr comment ${PR_NUMBER} --body-file pr_review.md`);
     console.log(`✅ Review posted successfully to PR #${PR_NUMBER}!`);
@@ -120,4 +149,4 @@ Format your review in GitHub Markdown with:
   }
 }
 
-reviewPR().catch(console.error);
+run().catch(console.error);
