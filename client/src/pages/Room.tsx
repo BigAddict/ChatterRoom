@@ -3,6 +3,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import { ChatWindow } from '../components/ChatWindow';
 import { MessageInput } from '../components/MessageInput';
 import { RoomHeader } from '../components/RoomHeader';
+import { observeChatViewport } from '../lib/chatViewport.js';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCrypto } from '../hooks/useCrypto';
 import { useRoom } from '../hooks/useRoom';
@@ -20,6 +21,10 @@ interface ServerMessage {
 export const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const location = useLocation();
+
+  useEffect(() => {
+    return observeChatViewport(document.documentElement.style, window);
+  }, []);
 
   // The key lives in the hash fragment so it's never sent to the server
   const encryptionKey = location.hash.slice(1);
@@ -88,7 +93,7 @@ export const Room: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-900 text-white">
+    <div className="chat-room flex flex-col bg-gray-900 text-white">
       <RoomHeader roomId={roomId} userCount={userCount} />
       <ChatWindow messages={messages} />
       <MessageInput onSend={handleSend} disabled={connectionStatus !== 'connected'} />

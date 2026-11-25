@@ -1,3 +1,25 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.chat-room {
+  position: fixed;
+  top: var(--chat-viewport-offset-top, 0px);
+  right: 0;
+  left: 0;
+  height: 100vh;
+  height: 100dvh;
+  height: var(--chat-viewport-height, 100vh);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chat-message-feed {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.chat-message-input {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
