@@ -3,6 +3,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import { ChatWindow } from '../components/ChatWindow';
 import { MessageInput } from '../components/MessageInput';
 import { RoomHeader } from '../components/RoomHeader';
+import { observeChatViewport } from '../lib/chatViewport.js';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCrypto } from '../hooks/useCrypto';
 import { useRoom } from '../hooks/useRoom';
@@ -22,21 +23,7 @@ export const Room: React.FC = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const visualViewport = window.visualViewport;
-    const updateViewportHeight = () => {
-      const height = visualViewport?.height ?? window.innerHeight;
-      document.documentElement.style.setProperty('--chat-viewport-height', `${height}px`);
-    };
-
-    updateViewportHeight();
-    window.addEventListener('resize', updateViewportHeight);
-    visualViewport?.addEventListener('resize', updateViewportHeight);
-
-    return () => {
-      window.removeEventListener('resize', updateViewportHeight);
-      visualViewport?.removeEventListener('resize', updateViewportHeight);
-      document.documentElement.style.removeProperty('--chat-viewport-height');
-    };
+    return observeChatViewport(document.documentElement.style, window);
   }, []);
 
   // The key lives in the hash fragment so it's never sent to the server
