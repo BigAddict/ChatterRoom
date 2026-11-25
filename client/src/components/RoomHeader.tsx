@@ -19,14 +19,14 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({ roomId, userCount }) => 
   };
 
   return (
-    <header className="flex items-center justify-between border-b border-gray-700 px-6 py-3">
+    <header className="flex items-center justify-between border-b border-gray-700 px-3 py-2 sm:px-6 sm:py-3">
       <div>
-        <h2 className="text-lg font-bold">🏴‍☠️ Room {roomId.slice(0, 8)}</h2>
-        <p className="text-sm text-gray-400">{userCount} user{userCount !== 1 ? 's' : ''} online</p>
+        <h2 className="text-base font-bold sm:text-lg">🏴‍☠️ Room {roomId.slice(0, 8)}</h2>
+        <p className="text-xs text-gray-400 sm:text-sm">{userCount} user{userCount !== 1 ? 's' : ''} online</p>
       </div>
       <button
         onClick={handleCopyLink}
-        className="rounded bg-gray-700 px-4 py-1 text-sm transition hover:bg-gray-600"
+        className="min-h-11 rounded bg-gray-700 px-3 py-2 text-sm transition hover:bg-gray-600 sm:px-4 sm:py-1"
       >
         Copy Link
       </button>

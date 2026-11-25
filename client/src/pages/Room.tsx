@@ -21,6 +21,24 @@ export const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const location = useLocation();
 
+  useEffect(() => {
+    const visualViewport = window.visualViewport;
+    const updateViewportHeight = () => {
+      const height = visualViewport?.height ?? window.innerHeight;
+      document.documentElement.style.setProperty('--chat-viewport-height', `${height}px`);
+    };
+
+    updateViewportHeight();
+    window.addEventListener('resize', updateViewportHeight);
+    visualViewport?.addEventListener('resize', updateViewportHeight);
+
+    return () => {
+      window.removeEventListener('resize', updateViewportHeight);
+      visualViewport?.removeEventListener('resize', updateViewportHeight);
+      document.documentElement.style.removeProperty('--chat-viewport-height');
+    };
+  }, []);
+
   // The key lives in the hash fragment so it's never sent to the server
   const encryptionKey = location.hash.slice(1);
 
@@ -88,7 +106,7 @@ export const Room: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-900 text-white">
+    <div className="chat-room flex flex-col bg-gray-900 text-white">
       <RoomHeader roomId={roomId} userCount={userCount} />
       <ChatWindow messages={messages} />
       <MessageInput onSend={handleSend} disabled={connectionStatus !== 'connected'} />

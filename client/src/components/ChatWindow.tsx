@@ -19,7 +19,7 @@ export interface ChatWindowProps {
  */
 export const ChatWindow: React.FC<ChatWindowProps> = ({ messages }) => {
   return (
-    <div className="flex-1 overflow-y-auto p-4">
+    <div className="chat-message-feed min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
       {messages.length === 0 ? (
         <p className="text-center text-gray-500">No messages yet. Start the conversation!</p>
       ) : (
