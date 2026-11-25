@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { ChatWindow } from '../components/ChatWindow';
 import { MessageInput } from '../components/MessageInput';
 import { RoomHeader } from '../components/RoomHeader';
@@ -21,6 +21,7 @@ interface ServerMessage {
 export const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     return observeChatViewport(document.documentElement.style, window);
@@ -31,7 +32,7 @@ export const Room: React.FC = () => {
 
   const { keys, encrypt, decrypt, isReady: cryptoReady } = useCrypto(encryptionKey);
   const { sendMessage, connectionStatus, lastMessage } = useWebSocket(roomId ?? '');
-  const { messages, userCount, addMessage, setUserCount } = useRoom();
+  const { messages, userCount, addMessage, setUserCount, clearMessages } = useRoom();
 
   useEffect(() => {
     if (!lastMessage) return;
@@ -84,6 +85,11 @@ export const Room: React.FC = () => {
     });
   };
 
+  const handleLeave = () => {
+    clearMessages();
+    navigate('/');
+  };
+
   if (!roomId || !encryptionKey) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-900 text-white">
@@ -94,7 +100,12 @@ export const Room: React.FC = () => {
 
   return (
     <div className="chat-room flex flex-col bg-gray-900 text-white">
-      <RoomHeader roomId={roomId} userCount={userCount} />
+      <RoomHeader
+        roomId={roomId}
+        userCount={userCount}
+        isEncrypted={cryptoReady}
+        onLeave={handleLeave}
+      />
       <ChatWindow messages={messages} />
       <MessageInput onSend={handleSend} disabled={connectionStatus !== 'connected'} />
     </div>
