@@ -4,19 +4,25 @@ import { RoomManager } from './room-manager.js';
 import { checkRateLimit } from '../middleware/rate-limiter.js';
 import { logger } from '../utils/logger.js';
 import { startHeartbeat } from './heartbeat.js';
+import { validateIncoming, type ClientMessage, type ValidationErrorCode } from './validator.js';
 
 const roomManager = new RoomManager();
 const leftSockets = new WeakSet<WebSocket>();
 
-interface IncomingMessage {
-  type: string;
-  roomId?: string;
-  data?: unknown;
-}
+/** Human-readable text for each validation error. Never includes client input. */
+const ERROR_MESSAGES: Record<ValidationErrorCode, string> = {
+  INVALID_JSON: 'Malformed JSON',
+  INVALID_SHAPE: 'Invalid message format',
+  PAYLOAD_TOO_LARGE: 'Payload too large',
+};
 
-const sendError = (socket: WebSocket, message: string): void => {
+const sendError = (socket: WebSocket, message: string, code?: ValidationErrorCode): void => {
   if (socket.readyState === socket.OPEN) {
-    socket.send(JSON.stringify({ type: 'error', data: message }));
+    const frame =
+      code === undefined
+        ? { type: 'error', data: message }
+        : { type: 'error', code, data: message };
+    socket.send(JSON.stringify(frame));
   }
 };
 
@@ -41,33 +47,21 @@ export const handleWebSocketConnection = (socket: WebSocket, req: FastifyRequest
   roomManager.joinRoom(roomId, socket);
   startHeartbeat(socket);
 
-  socket.on('message', (raw: Buffer) => {
+  socket.on('message', (raw: Buffer, isBinary: boolean) => {
     // Rate limiting
     if (!checkRateLimit(clientIp)) {
       sendError(socket, 'Rate limit exceeded');
       return;
     }
 
-    try {
-      const parsed: unknown = JSON.parse(raw.toString());
-      if (
-        typeof parsed !== 'object' ||
-        parsed === null ||
-        !('type' in parsed) ||
-        typeof parsed.type !== 'string' ||
-        parsed.type.trim().length === 0
-      ) {
-        logger.warn(`Invalid message format from ${clientIp}`);
-        sendError(socket, 'Invalid message format');
-        return;
-      }
-
-      const message = parsed as IncomingMessage;
-      onMessage(roomId, socket, message);
-    } catch {
-      logger.warn(`Malformed message from ${clientIp}`);
-      sendError(socket, 'Malformed JSON');
+    // Validate size, JSON and exact shape before anything is relayed
+    const result = validateIncoming(raw, isBinary);
+    if (!result.ok) {
+      sendError(socket, ERROR_MESSAGES[result.code], result.code);
+      return;
     }
+
+    onMessage(roomId, socket, result.message);
   });
 
   socket.on('close', () => {
@@ -80,13 +74,13 @@ export const handleWebSocketConnection = (socket: WebSocket, req: FastifyRequest
 };
 
 /**
- * Handle an incoming message from a client.
+ * Handle a validated message from a client.
  *
  * @param roomId - The room the message was sent in
  * @param sender - The sending WebSocket
- * @param message - The parsed message payload
+ * @param message - The validated message
  */
-export const onMessage = (roomId: string, sender: WebSocket, message: IncomingMessage): void => {
+export const onMessage = (roomId: string, sender: WebSocket, message: ClientMessage): void => {
   switch (message.type) {
     case 'join':
       if (!roomManager.isClientInRoom(roomId, sender)) {
@@ -111,9 +105,10 @@ export const onMessage = (roomId: string, sender: WebSocket, message: IncomingMe
       // Backward-compatible alias for the original chat message protocol.
       roomManager.broadcastToRoom(roomId, JSON.stringify(message), sender);
       break;
-    default:
-      logger.warn(`Unknown message type: ${message.type}`);
-      sendError(sender, `Unknown message type: ${message.type}`);
+    default: {
+      const unreachable: never = message;
+      void unreachable;
+    }
   }
 };
 
