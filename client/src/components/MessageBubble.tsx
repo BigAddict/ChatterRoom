@@ -12,27 +12,32 @@ export interface MessageBubbleProps {
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const alignment = message.isMine ? 'justify-end' : 'justify-start';
   const bubbleStyles = message.isMine
-    ? 'rounded-2xl rounded-br-sm bg-emerald-600 text-white'
-    : 'rounded-2xl rounded-bl-sm border border-slate-700 bg-slate-800 text-slate-100';
-  const senderStyles = message.isMine ? 'text-emerald-100' : 'text-cyan-300';
-  const timeStyles = message.isMine ? 'text-emerald-100/80' : 'text-slate-400';
+    ? 'rounded-2xl rounded-br-sm border border-amber-400/50 bg-amber-500 text-[#0B111A] shadow-sm'
+    : 'rounded-2xl rounded-bl-sm border border-slate-200 bg-white text-slate-900 shadow-sm dark:border-slate-800 dark:bg-[#131C2B] dark:text-slate-100';
+  const senderStyles = message.isMine
+    ? 'text-[#0B111A]/85'
+    : 'text-amber-700 dark:text-amber-400';
+  const timeStyles = message.isMine
+    ? 'text-[#0B111A]/80 font-medium'
+    : 'text-slate-600 dark:text-slate-300';
 
-  return (
-    <div className={`flex ${alignment}`}>
-      <div className={`max-w-[80%] px-4 py-2 shadow-sm sm:max-w-md ${bubbleStyles}`}>
-        <p className={`mb-1 text-xs font-semibold ${senderStyles}`}>
-          {message.sender}
-        </p>
-        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-          {message.content}
-        </p>
-        <time
-          dateTime={new Date(message.timestamp).toISOString()}
-          className={`mt-1 block text-right text-[11px] ${timeStyles}`}
-        >
-          {formatMessageTime(message.timestamp)}
-        </time>
-      </div>
+return (
+  <div className={`flex w-full ${alignment} transition-all duration-200`}>
+    <div
+      className={`w-fit max-w-[80%] shrink-0 px-4 py-2 transition-colors duration-200 sm:max-w-md ${bubbleStyles}`}
+    >
+      <p className={`mb-1 text-xs font-semibold ${senderStyles}`}>
+        {message.sender}
+      </p>
+      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+        {message.content}
+      </p>
+      <time
+        dateTime={new Date(message.timestamp).toISOString()}
+        className={`mt-1 block text-right text-xs ${timeStyles}`}
+      >
+        {formatMessageTime(message.timestamp)}
+      </time>
     </div>
-  );
-};
+  </div>
+);};
