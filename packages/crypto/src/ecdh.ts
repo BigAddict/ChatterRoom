@@ -30,6 +30,11 @@ export const generateECDHKeyPair = async (): Promise<KeyPair> => {
 };
 
 /**
+ * Alias for {@link generateECDHKeyPair}.
+ */
+export const generateKeyPair = generateECDHKeyPair;
+
+/**
  * Derive a shared AES-256-GCM secret key from a local ECDH private key
  * and a remote ECDH public key.
  *

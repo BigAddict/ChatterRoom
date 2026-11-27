@@ -7,7 +7,7 @@
  * @packageDocumentation
  */
 
-export { generateECDHKeyPair, deriveSharedSecret } from './ecdh.js';
+export { generateECDHKeyPair, generateKeyPair, deriveSharedSecret } from './ecdh.js';
 export { aesEncrypt, aesDecrypt, type AESEncryptedPayload } from './aes.js';
 export * from './aesGcm.js';
 export { deriveKey, deriveRoomKeyFromHash, exportPublicKey, importPublicKey } from './keys.js';
